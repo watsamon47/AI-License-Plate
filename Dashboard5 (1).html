@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>License Plate Management System</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        :root {
+            --primary-color: #4e73df; /* สีน้ำเงินราชการ/ทางการ */
+            --secondary-color: #858796;
+            --sidebar-bg: #ffffff;
+            --bg-color: #f8f9fc;
+            --success-color: #1cc88a;
+            --danger-color: #e74a3b;
+            --warning-color: #f6c23e;
+        }
+
+        body {
+            font-family: 'Prompt', sans-serif;
+            background-color: var(--bg-color);
+            overflow-x: hidden;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            min-height: 100vh;
+            background: var(--sidebar-bg);
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+            z-index: 100;
+            position: fixed;
+            width: 250px;
+        }
+
+        .sidebar .nav-link {
+            color: var(--secondary-color);
+            padding: 1rem;
+            font-weight: 500;
+            transition: all 0.3s;
+            border-left: 4px solid transparent;
+        }
+
+        .sidebar .nav-link:hover, .sidebar .nav-link.active {
+            color: var(--primary-color);
+            background-color: #f0f4ff;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .sidebar .nav-link i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .logo-section {
+            padding: 2rem 1rem;
+            display: flex;
+            align-items: center;
+            color: var(--primary-color);
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+
+        /* Cards */
+        .card-custom {
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.10);
+            transition: transform 0.2s;
+            height: 100%;
+        }
+
+        .card-custom:hover {
+            transform: translateY(-5px);
+        }
+
+        .stat-card {
+            border-left: 4px solid;
+        }
+        .stat-card.primary { border-color: var(--primary-color); }
+        .stat-card.success { border-color: var(--success-color); }
+        .stat-card.danger { border-color: var(--danger-color); }
+        .stat-card.warning { border-color: var(--warning-color); }
+
+        /* Tables */
+        .table-custom thead th {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            font-weight: 500;
+        }
+        
+        .table-custom tbody tr:hover {
+            background-color: #f8f9fc;
+        }
+        
+        .table-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.10);
+        }
+
+        /* Status Badges */
+        .badge-custom {
+            padding: 0.5em 0.8em;
+            border-radius: 50px;
+            font-size: 0.85em;
+            font-weight: 400;
+        }
+
+        /* Header Bar */
+        .top-bar {
+            background: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* Section Visibility */
+        .page-section {
+            display: none;
+            animation: fadeIn 0.5s;
+        }
+        .page-section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar d-flex flex-column">
+        <div class="logo-section">
+            <div class="bg-primary text-white rounded-circle d-flex justify-content-center align-items-center me-2" style="width: 40px; height: 40px;">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <span>AI License Plate</span>
+        </div>
+        <ul class="nav flex-column mb-auto">
+            <li class="nav-item">
+                <a href="#" class="nav-link active" onclick="showSection('dashboard', this)">
+                    <i class="fas fa-home"></i> หน้าหลัก
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link" onclick="showSection('car-list', this)">
+                    <i class="fas fa-list"></i> ข้อมูลทะเบียนรถ
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#" class="nav-link" onclick="showSection('add-data', this)">
+                    <i class="fas fa-plus-circle"></i> เพิ่มข้อมูล
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        
+        <div class="top-bar">
+            <div class="d-flex align-items-center text-muted">
+                <i class="far fa-clock me-2"></i>
+                <span id="current-time">Tue 4, 15:45:58 PM</span>
+            </div>
+        </div>
+
+        <div id="dashboard" class="page-section active">
+            <h4 class="mb-4 text-gray-800">ภาพรวมระบบ (Dashboard)</h4>
+            
+            <div class="row">
+                <div class="col-lg-4 mb-4">
+                    <div class="row g-3 mb-4">
+                        <div class="col-6">
+                            <div class="card-custom stat-card primary p-3">
+                                <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">รถเข้า (คัน)</div>
+                                <div class="h3 mb-0 font-weight-bold text-gray-800">145</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card-custom stat-card warning p-3">
+                                <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">รถออก (คัน)</div>
+                                <div class="h3 mb-0 font-weight-bold text-gray-800">112</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card-custom stat-card success p-3">
+                                <div class="text-xs font-weight-bold text-success text-uppercase mb-1">อนุญาต</div>
+                                <div class="h3 mb-0 font-weight-bold text-gray-800">240</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card-custom stat-card danger p-3">
+                                <div class="text-xs font-weight-bold text-danger text-uppercase mb-1">ปฏิเสธ</div>
+                                <div class="h3 mb-0 font-weight-bold text-gray-800">5</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-custom p-3 bg-white" style="height: auto;">
+                        <h6 class="font-weight-bold text-primary mb-3">สถิติการเข้า-ออกรายชั่วโมง</h6>
+    
+                        <div style="position: relative; height: 350px; width: 100%;">
+                            <canvas id="trafficChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-8 mb-4">
+                    <div class="table-container h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="m-0 font-weight-bold text-primary">การเข้า-ออกล่าสุด</h5>
+                            <button class="btn btn-sm btn-outline-primary rounded-pill">ดูทั้งหมด</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-custom align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>ทะเบียน</th>
+                                        <th>จังหวัด</th>
+                                        <th>ยี่ห้อ/สี</th>
+                                        <th>เจ้าของรถ</th>
+                                        <th>เวลา</th>
+                                        <th>สถานะ</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dashboard-table-body">
+                                    </tbody>
+                            </table>
+                        </div>
+                        <nav aria-label="Page navigation" class="mt-3">
+                            <ul class="pagination justify-content-end mb-0">
+                                <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
+                                <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                                <li class="page-item"><a class="page-link" href="#">2</a></li>
+                                <li class="page-item"><a class="page-link" href="#">3</a></li>
+                                <li class="page-item"><a class="page-link" href="#">Next</a></li>
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="car-list" class="page-section">
+            <h4 class="mb-4 text-gray-800">ข้อมูลทะเบียนรถทั้งหมด</h4>
+            <div class="table-container">
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                         <div class="input-group">
+                            <span class="input-group-text bg-light border-0"><i class="fas fa-search"></i></span>
+                            <input type="text" class="form-control bg-light border-0 small" placeholder="ค้นหาทะเบียน, ชื่อ..." aria-label="Search">
+                         </div>
+                    </div>
+                    <div class="col-md-6 text-end">
+                        <button class="btn btn-success btn-icon-split shadow-sm">
+                            <span class="icon text-white-50"><i class="fas fa-file-excel"></i></span>
+                            <span class="text">Export CSV</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-custom table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>ลำดับ</th>
+                                <th>เลขป้ายทะเบียน</th>
+                                <th>จังหวัด</th>
+                                <th>ยี่ห้อรถ</th>
+                                <th>สีรถ</th>
+                                <th>ชื่อ-นามสกุล เจ้าของ</th>
+                                <th>สถานะ</th>
+                                <th>จัดการ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="full-table-body">
+                            </tbody>
+                    </table>
+                </div>
+
+                <nav aria-label="Page navigation" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        <li class="page-item disabled"><a class="page-link" href="#">ก่อนหน้า</a></li>
+                        <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                        <li class="page-item"><a class="page-link" href="#">2</a></li>
+                        <li class="page-item"><a class="page-link" href="#">3</a></li>
+                        <li class="page-item"><a class="page-link" href="#">...</a></li>
+                        <li class="page-item"><a class="page-link" href="#">10</a></li>
+                        <li class="page-item"><a class="page-link" href="#">ถัดไป</a></li>
+                    </ul>
+                </nav>
+            </div>
+        </div>
+
+        <div id="add-data" class="page-section">
+            <h4 class="mb-4 text-gray-800">เพิ่มข้อมูลทะเบียนรถใหม่</h4>
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="card-custom p-5 bg-white">
+                        <div class="text-center mb-4">
+                            <div class="avatar bg-light rounded-circle mx-auto mb-3 d-flex justify-content-center align-items-center" style="width: 80px; height: 80px;">
+                                <i class="fas fa-car fa-2x text-primary"></i>
+                            </div>
+                            <h5 class="text-primary font-weight-bold">กรอกรายละเอียดรถ</h5>
+                            <p class="text-muted small">กรุณากรอกข้อมูลให้ครบถ้วนเพื่อบันทึกลงฐานข้อมูล</p>
+                        </div>
+
+                        <form id="addCarForm" onsubmit="submitForm(event)">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">เลขป้ายทะเบียน <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-lg bg-light border-0" placeholder="เช่น 1กข 1234" required name="license_plate">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">จังหวัด <span class="text-danger">*</span></label>
+                                    <select class="form-select form-select-lg bg-light border-0" required name="province">
+                                        <option value="" selected disabled>เลือกจังหวัด</option>
+                                        <option value="กรุงเทพมหานคร">กรุงเทพมหานคร</option>
+                                        <option value="เชียงใหม่">เชียงใหม่</option>
+                                        <option value="ขอนแก่น">ขอนแก่น</option>
+                                        <option value="ชลบุรี">ชลบุรี</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">ยี่ห้อรถ</label>
+                                    <input type="text" class="form-control form-control-lg bg-light border-0" placeholder="เช่น Toyota, Honda" name="brand">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">สีรถ</label>
+                                    <input type="text" class="form-control form-control-lg bg-light border-0" placeholder="เช่น ขาว, ดำ" name="color">
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">ชื่อ-นามสกุล เจ้าของรถ <span class="text-danger">*</span></label>
+                                    <input type="text" class="form-control form-control-lg bg-light border-0" placeholder="ระบุชื่อจริง นามสกุล" required name="owner">
+                                </div>
+                                
+                                <div class="col-12 mt-4">
+                                    <button type="submit" class="btn btn-primary btn-lg w-100 shadow-sm">
+                                        <i class="fas fa-save me-2"></i> บันทึกข้อมูล
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // 1. Clock Function (นาฬิกา)
+        function updateTime() {
+            const now = new Date();
+            const options = { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+            document.getElementById('current-time').innerText = now.toLocaleString('th-TH', options);
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+
+        // 2. Navigation Logic (เปลี่ยนหน้า)
+        function showSection(sectionId, element) {
+            document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+            
+            document.querySelectorAll('.sidebar .nav-link').forEach(link => link.classList.remove('active'));
+            element.classList.add('active');
+        }
+
+        // 3. Google Sheets Connection
+        // --- URL ของ Google Apps Script ---
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbyGHuocj5zSach0XTWra9P0D9yy9KvFxJYLuS1HZpZ5NgjcohRPwhYMR1HSb-DbavHU/exec'; 
+        
+        let carData = []; // ตัวแปรเก็บข้อมูลหลัก
+
+        // ฟังก์ชันโหลดข้อมูล
+        function loadData() {
+            // console.log("กำลังโหลดข้อมูล...");
+            fetch(scriptURL + '?action=read') 
+                .then(response => response.json())
+                .then(json => {
+                    if(json.result === "success") {
+                        carData = json.data; // เก็บข้อมูลลงตัวแปร
+                        renderDashboardTable(); // วาดตาราง Dashboard
+                        renderFullTable();      // วาดตารางข้อมูลทั้งหมด
+                        updateStats();          // อัพเดทตัวเลขสถิติ
+                    } else {
+                        console.error("Error loading data:", json);
+                    }
+                })
+                .catch(err => console.error('Error fetching data:', err));
+        }
+
+        // 4. Render Functions (วาดตาราง)
+
+        // ตาราง Dashboard (แก้ไขแล้ว)
+        function renderDashboardTable() {
+            const tbody = document.getElementById('dashboard-table-body');
+            tbody.innerHTML = ''; 
+        
+            // ไม่ต้อง reverse() แล้ว เพราะ API ส่งของใหม่มาให้อยู่บนสุดแล้ว
+            // บรรทัดนี้จะกลับด้านข้อมูล ทำให้ของใหม่ไปอยู่ล่างสุด
+            const recentData = carData.slice().reverse().slice(0, 10);
+
+            recentData.forEach(item => {
+                let statusVal = item['status'] ? item['status'].toLowerCase() : '';
+                let statusBadge = '';
+                
+                if (statusVal === 'allow' || statusVal === 'in') {
+                    statusBadge = '<span class="badge badge-custom bg-success text-white">อนุญาต</span>';
+                } else if (statusVal === 'deny' || statusVal === 'out') {
+                    statusBadge = '<span class="badge badge-custom bg-danger text-white">ปฏิเสธ</span>';
+                } else {
+                    statusBadge = '<span class="badge badge-custom bg-secondary text-white">รอดำเนินการ</span>';
+                }
+            
+                // --- แก้ไขตรงนี้ ---
+                // เรียงลำดับให้ตรงกับหัวตาราง: ทะเบียน -> จังหวัด -> ยี่ห้อ/สี -> เจ้าของ -> เวลา -> สถานะ
+                tbody.innerHTML += `
+                    <tr>
+                        <td class="fw-bold text-primary">${item['license_plate'] || '-'}</td>
+                        <td>${item['province'] || '-'}</td>
+                        <td>${item['brand'] || '-'} / ${item['color'] || '-'}</td> 
+                        <td>${item['owner'] || '-'}</td>
+                        <td>${item['datetime'] || '-'}</td>
+                        <td>${statusBadge}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        // ตาราง Full List (แสดงทั้งหมด)
+        function renderFullTable() {
+            const tbody = document.getElementById('full-table-body');
+            tbody.innerHTML = '';
+            
+            // แสดงข้อมูลโดยเรียงล่าสุดขึ้นก่อน
+            const allData = carData.slice().reverse();
+
+            allData.forEach((item, index) => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td class="fw-bold">${item['license_plate'] || ''}</td>
+                        <td>${item['province'] || ''}</td>
+                        <td>${item['brand'] || ''}</td>
+                        <td>${item['color'] || ''}</td>
+                        <td>${item['owner'] || ''}</td>
+                        <td>${item['status'] || '-'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning text-white me-1" 
+                                onclick="editData('${item.license_plate}', '${item.province}', '${item.brand}', '${item.color}', '${item.owner}')">
+                                <i class="fas fa-pen"></i>
+                            </button>
+                            
+                            <button class="btn btn-sm btn-danger" 
+                                onclick="deleteData('${item.license_plate}')">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // อัพเดทตัวเลข Card
+        function updateStats() {
+            // โค้ดสำหรับนับจำนวน (ตัวอย่าง)
+            // คุณต้องมี ID ที่ element HTML ตัวเลขก่อน ถึงจะสั่งเปลี่ยนค่าได้
+            // เช่น document.querySelector('.card-custom.primary .h3').innerText = carData.length;
+        }
+
+        // 5. Submit Form Function (บันทึกข้อมูล)
+        function submitForm(event) {
+            event.preventDefault();
+            
+            Swal.fire({
+                title: 'กำลังบันทึก...',
+                allowOutsideClick: false,
+                didOpen: () => { Swal.showLoading() }
+            });
+
+            const form = document.forms['addCarForm'];
+            const formData = new FormData(form);
+
+            // ส่งข้อมูลไป Google Sheet
+            fetch(scriptURL, { method: 'POST', body: formData })
+                .then(response => {
+                    Swal.fire('สำเร็จ!', 'บันทึกข้อมูลเรียบร้อย', 'success');
+                    form.reset();
+                    loadData(); // โหลดข้อมูลใหม่ทันทีเพื่ออัพเดทตาราง
+                    showSection('car-list', document.querySelectorAll('.nav-link')[1]); // เด้งไปหน้า List
+                })
+                .catch(error => {
+                    Swal.fire('เกิดข้อผิดพลาด!', 'เชื่อมต่อไม่ได้', 'error');
+                    console.error('Error!', error.message);
+                });
+        }
+
+        // 6. Chart.js (กราฟ - ปัจจุบันเป็น Mock Data คงที่)
+        // ถ้าต้องการกราฟจริง ต้องเขียน Logic นำ data มา group ตามชั่วโมง
+        const ctx = document.getElementById('trafficChart').getContext('2d');
+        const trafficChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'],
+                datasets: [
+                    {
+                        label: 'รถเข้า',
+                        data: [12, 19, 3, 5, 2, 3, 10], // ข้อมูลสมมติ
+                        backgroundColor: '#4e73df',
+                        borderRadius: 5
+                    },
+                    {
+                        label: 'รถออก',
+                        data: [2, 5, 13, 8, 12, 5, 4], // ข้อมูลสมมติ
+                        backgroundColor: '#f6c23e',
+                        borderRadius: 5
+                    }
+                ]
+            },
+            options: {
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, grid: { borderDash: [2, 4] } },
+                    x: { grid: { display: false } }
+                },
+                plugins: {
+                    legend: { position: 'top' }
+                }
+            }
+        });
+
+        
+        // *** เรียกใช้งานเมื่อเปิดเว็บ ***
+        window.addEventListener('load', function() {
+            updateTime();
+            loadData(); // โหลดครั้งแรกทันที
+            
+            // เพิ่ม: สั่งให้โหลดข้อมูลใหม่ทุกๆ 3 วินาที (Auto Refresh)
+            setInterval(() => {
+                // โหลดข้อมูลใหม่แบบเงียบๆ (ไม่ต้องโชว์ Loading ตลอดเวลา)
+                fetch(scriptURL + '?action=read')
+                .then(response => response.json())
+                .then(json => {
+                    if(json.result === "success") {
+                        // เช็คว่าข้อมูลเปลี่ยนไปไหม หรือจะทับเลยก็ได้
+                        carData = json.data; 
+                        renderDashboardTable(); 
+                        renderFullTable();      
+                        updateStats();          
+                    }
+                })
+                .catch(err => console.error('Auto-refresh error:', err));
+            }, 3000); // 3000 ms = 3 วินาที
+        });
+
+        // --- ฟังก์ชันลบข้อมูล ---
+        function deleteData(plate) {
+            Swal.fire({
+                title: 'ยืนยันการลบ?',
+                text: "คุณต้องการลบทะเบียน " + plate + " ใช่หรือไม่?",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#3085d6',
+                confirmButtonText: 'ใช่, ลบเลย!',
+                cancelButtonText: 'ยกเลิก'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({ title: 'กำลังลบ...', didOpen: () => Swal.showLoading() });
+                    
+                    // สร้าง Form Data เพื่อส่งคำสั่งลบ
+                    const formData = new FormData();
+                    formData.append('action', 'delete'); // บอก Script ว่าให้ลบ
+                    formData.append('license_plate', plate); // บอกทะเบียนที่จะลบ
+
+                    fetch(scriptURL, { method: 'POST', body: formData })
+                        .then(response => response.json())
+                        .then(res => {
+                            if(res.result === 'success'){
+                                Swal.fire('ลบสำเร็จ!', '', 'success');
+                                loadData(); // โหลดตารางใหม่
+                            } else {
+                                Swal.fire('ผิดพลาด', 'ไม่พบข้อมูล หรือระบบมีปัญหา', 'error');
+                            }
+                        })
+                        .catch(err => console.error(err));
+                }
+            });
+        }
+
+        // --- ฟังก์ชันแก้ไขข้อมูล (ใช้ Popup ของ SweetAlert) ---
+        function editData(plate, prov, brand, color, owner) {
+            Swal.fire({
+                title: 'แก้ไขข้อมูลรถ',
+                html: `
+                    <input id="edit-plate" class="swal2-input" placeholder="ทะเบียน" value="${plate}">
+                    <input id="edit-prov" class="swal2-input" placeholder="จังหวัด" value="${prov}">
+                    <input id="edit-brand" class="swal2-input" placeholder="ยี่ห้อ" value="${brand}">
+                    <input id="edit-color" class="swal2-input" placeholder="สี" value="${color}">
+                    <input id="edit-owner" class="swal2-input" placeholder="เจ้าของ" value="${owner}">
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'บันทึกแก้ไข',
+                preConfirm: () => {
+                    return {
+                        newPlate: document.getElementById('edit-plate').value,
+                        newProv: document.getElementById('edit-prov').value,
+                        newBrand: document.getElementById('edit-brand').value,
+                        newColor: document.getElementById('edit-color').value,
+                        newOwner: document.getElementById('edit-owner').value
+                    }
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const data = result.value;
+                    Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading() });
+
+                    const formData = new FormData();
+                    formData.append('action', 'edit'); // บอก Script ว่าให้แก้ไข
+                    formData.append('old_license_plate', plate); // ส่งทะเบียนเก่าไปหาบรรทัด
+                    
+                    // ส่งค่าใหม่ไปบันทึก
+                    formData.append('license_plate', data.newPlate);
+                    formData.append('province', data.newProv);
+                    formData.append('brand', data.newBrand);
+                    formData.append('color', data.newColor);
+                    formData.append('owner', data.newOwner);
+
+                    fetch(scriptURL, { method: 'POST', body: formData })
+                        .then(response => response.json())
+                        .then(res => {
+                            if(res.result === 'success'){
+                                Swal.fire('บันทึกแล้ว!', '', 'success');
+                                loadData(); // โหลดตารางใหม่
+                            } else {
+                                Swal.fire('Error', res.message, 'error');
+                            }
+                        });
+                }
+            });
+        }
+    </script>
+</body>
+</html>
