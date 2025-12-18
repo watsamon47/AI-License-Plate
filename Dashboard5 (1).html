@@ -377,7 +377,11 @@
     </div>
 
     <script>
-        // 1. Clock Function (นาฬิกา)
+        // --- 1. ตั้งค่าพื้นฐาน ---
+        // URL ของ Google Apps Script (ตรวจสอบให้แน่ใจว่าเป็น Deployment ล่าสุด)
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbxKZIoVrcfRZT620ODb2MWNoVYWOsoCehrDmn8eLMAXCc0X3FuvSUidu0YTnYMOzlCY/exec'; 
+
+        // --- 2. นาฬิกา (Clock) ---
         function updateTime() {
             const now = new Date();
             const options = { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit' };
@@ -386,101 +390,114 @@
         setInterval(updateTime, 1000);
         updateTime();
 
-        // 2. Navigation Logic (เปลี่ยนหน้า)
+        // --- 3. การเปลี่ยนหน้า (Navigation) ---
         function showSection(sectionId, element) {
             document.querySelectorAll('.page-section').forEach(sec => sec.classList.remove('active'));
             document.getElementById(sectionId).classList.add('active');
             
             document.querySelectorAll('.sidebar .nav-link').forEach(link => link.classList.remove('active'));
             element.classList.add('active');
+
+            // ถ้ากดมาหน้า Car List ให้โหลดข้อมูลรถทะเบียนรถ
+            if(sectionId === 'car-list') {
+                loadCarDatabase();
+            }
         }
 
-        // 3. Google Sheets Connection
-        // --- URL ของ Google Apps Script ---
-        const scriptURL = 'https://script.google.com/macros/s/AKfycbyGHuocj5zSach0XTWra9P0D9yy9KvFxJYLuS1HZpZ5NgjcohRPwhYMR1HSb-DbavHU/exec'; 
-        
-        let carData = []; // ตัวแปรเก็บข้อมูลหลัก
-
-        // ฟังก์ชันโหลดข้อมูล
-        function loadData() {
-            // console.log("กำลังโหลดข้อมูล...");
-            fetch(scriptURL + '?action=read') 
-                .then(response => response.json())
-                .then(json => {
-                    if(json.result === "success") {
-                        carData = json.data; // เก็บข้อมูลลงตัวแปร
-                        renderDashboardTable(); // วาดตาราง Dashboard
-                        renderFullTable();      // วาดตารางข้อมูลทั้งหมด
-                        updateStats();          // อัพเดทตัวเลขสถิติ
-                    } else {
-                        console.error("Error loading data:", json);
-                    }
-                })
-                .catch(err => console.error('Error fetching data:', err));
+        // --- 4. โหลดข้อมูล "Log การเข้า-ออก" (Dashboard Real-time) ---
+        function fetchRealtimeLogs() {
+            // ใส่ &t=... เพื่อแก้ปัญหา Browser จำค่าเดิม (Cache)
+            fetch(scriptURL + "?action=read_log&t=" + new Date().getTime())
+            .then(response => response.json())
+            .then(json => {
+                if (json.result === "success") {
+                    updateDashboardTable(json.data); // วาดตาราง
+                    updateStats(json.data); // อัพเดทตัวเลขการ์ด
+                }
+            })
+            .catch(error => console.error('Error fetching logs:', error));
         }
 
-        // 4. Render Functions (วาดตาราง)
+        // ฟังก์ชันวาดตาราง Dashboard
+        function updateDashboardTable(logs) {
+            const tbody = document.getElementById('dashboard-table-body'); // แก้ ID ให้ถูก
+            tbody.innerHTML = ""; 
+            
+            // แสดงแค่ 10 รายการล่าสุด
+            const recentLogs = logs.slice(0, 10); 
 
-        // ตาราง Dashboard (แก้ไขแล้ว)
-        function renderDashboardTable() {
-            const tbody = document.getElementById('dashboard-table-body');
-            tbody.innerHTML = ''; 
-        
-            // ไม่ต้อง reverse() แล้ว เพราะ API ส่งของใหม่มาให้อยู่บนสุดแล้ว
-            // บรรทัดนี้จะกลับด้านข้อมูล ทำให้ของใหม่ไปอยู่ล่างสุด
-            const recentData = carData.slice().reverse().slice(0, 10);
-
-            recentData.forEach(item => {
+            recentLogs.forEach(item => {
                 let statusVal = item['status'] ? item['status'].toLowerCase() : '';
                 let statusBadge = '';
                 
                 if (statusVal === 'allow' || statusVal === 'in') {
                     statusBadge = '<span class="badge badge-custom bg-success text-white">อนุญาต</span>';
-                } else if (statusVal === 'deny' || statusVal === 'out') {
-                    statusBadge = '<span class="badge badge-custom bg-danger text-white">ปฏิเสธ</span>';
                 } else {
-                    statusBadge = '<span class="badge badge-custom bg-secondary text-white">รอดำเนินการ</span>';
+                    statusBadge = '<span class="badge badge-custom bg-danger text-white">ปฏิเสธ</span>';
                 }
             
-                // --- แก้ไขตรงนี้ ---
-                // เรียงลำดับให้ตรงกับหัวตาราง: ทะเบียน -> จังหวัด -> ยี่ห้อ/สี -> เจ้าของ -> เวลา -> สถานะ
                 tbody.innerHTML += `
                     <tr>
-                        <td class="fw-bold text-primary">${item['license_plate'] || '-'}</td>
-                        <td>${item['province'] || '-'}</td>
-                        <td>${item['brand'] || '-'} / ${item['color'] || '-'}</td> 
-                        <td>${item['owner'] || '-'}</td>
-                        <td>${item['datetime'] || '-'}</td>
+                        <td class="fw-bold text-primary">${item.license_plate}</td>
+                        <td>${item.province}</td>
+                        <td>${item.brand} / ${item.color}</td> 
+                        <td>${item.owner}</td>
+                        <td>${formatDate(item.timestamp)}</td>
                         <td>${statusBadge}</td>
                     </tr>
                 `;
             });
         }
 
-        // ตาราง Full List (แสดงทั้งหมด)
-        function renderFullTable() {
+        // ฟังก์ชันอัพเดทตัวเลขสถิติบนการ์ด
+        function updateStats(logs) {
+            // นับจำนวนรถเข้า (นับทั้งหมดใน Log)
+            // คุณอาจต้องปรับ Logic นี้ตามความต้องการจริง
+            const totalIn = logs.length;
+            const totalAllow = logs.filter(l => l.status === 'allow').length;
+            const totalDeny = logs.filter(l => l.status === 'deny').length;
+
+            // เลือก Element และใส่ค่า (ต้องมี class ที่เจาะจงกว่านี้ใน HTML แต่ใส่แบบนี้ไปก่อน)
+            // แนะนำให้ไปเพิ่ม id ให้กับตัวเลขในการ์ด HTML จะแม่นยำกว่า
+            document.querySelectorAll('.stat-card .h3')[0].innerText = totalIn; 
+            document.querySelectorAll('.stat-card .h3')[2].innerText = totalAllow;
+            document.querySelectorAll('.stat-card .h3')[3].innerText = totalDeny;
+        }
+
+
+        // --- 5. โหลดข้อมูล "ทะเบียนรถทั้งหมด" (หน้า Car List) ---
+        function loadCarDatabase() {
+            fetch(scriptURL + '?action=read&t=' + new Date().getTime()) 
+                .then(response => response.json())
+                .then(json => {
+                    if(json.result === "success") {
+                        renderFullTable(json.data);
+                    }
+                });
+        }
+
+        function renderFullTable(data) {
             const tbody = document.getElementById('full-table-body');
             tbody.innerHTML = '';
             
-            // แสดงข้อมูลโดยเรียงล่าสุดขึ้นก่อน
-            const allData = carData.slice().reverse();
+            // กลับด้านเอาล่าสุดขึ้นก่อน
+            const allData = data.slice().reverse();
 
             allData.forEach((item, index) => {
                 tbody.innerHTML += `
                     <tr>
                         <td>${index + 1}</td>
-                        <td class="fw-bold">${item['license_plate'] || ''}</td>
-                        <td>${item['province'] || ''}</td>
-                        <td>${item['brand'] || ''}</td>
-                        <td>${item['color'] || ''}</td>
-                        <td>${item['owner'] || ''}</td>
-                        <td>${item['status'] || '-'}</td>
+                        <td class="fw-bold">${item.license_plate}</td>
+                        <td>${item.province}</td>
+                        <td>${item.brand}</td>
+                        <td>${item.color}</td>
+                        <td>${item.owner}</td>
+                        <td>${item.status}</td>
                         <td>
                             <button class="btn btn-sm btn-warning text-white me-1" 
                                 onclick="editData('${item.license_plate}', '${item.province}', '${item.brand}', '${item.color}', '${item.owner}')">
                                 <i class="fas fa-pen"></i>
                             </button>
-                            
                             <button class="btn btn-sm btn-danger" 
                                 onclick="deleteData('${item.license_plate}')">
                                 <i class="fas fa-trash"></i>
@@ -491,14 +508,8 @@
             });
         }
 
-        // อัพเดทตัวเลข Card
-        function updateStats() {
-            // โค้ดสำหรับนับจำนวน (ตัวอย่าง)
-            // คุณต้องมี ID ที่ element HTML ตัวเลขก่อน ถึงจะสั่งเปลี่ยนค่าได้
-            // เช่น document.querySelector('.card-custom.primary .h3').innerText = carData.length;
-        }
 
-        // 5. Submit Form Function (บันทึกข้อมูล)
+        // --- 6. Form Submit (เพิ่มข้อมูล) ---
         function submitForm(event) {
             event.preventDefault();
             
@@ -511,114 +522,52 @@
             const form = document.forms['addCarForm'];
             const formData = new FormData(form);
 
-            // ส่งข้อมูลไป Google Sheet
             fetch(scriptURL, { method: 'POST', body: formData })
-                .then(response => {
-                    Swal.fire('สำเร็จ!', 'บันทึกข้อมูลเรียบร้อย', 'success');
-                    form.reset();
-                    loadData(); // โหลดข้อมูลใหม่ทันทีเพื่ออัพเดทตาราง
-                    showSection('car-list', document.querySelectorAll('.nav-link')[1]); // เด้งไปหน้า List
+                .then(response => response.json())
+                .then(res => {
+                    if(res.result === "success") {
+                        Swal.fire('สำเร็จ!', 'บันทึกข้อมูลเรียบร้อย', 'success');
+                        form.reset();
+                    } else {
+                        Swal.fire('Error', res.message, 'error');
+                    }
                 })
                 .catch(error => {
-                    Swal.fire('เกิดข้อผิดพลาด!', 'เชื่อมต่อไม่ได้', 'error');
-                    console.error('Error!', error.message);
+                    Swal.fire('Error', 'เชื่อมต่อไม่ได้', 'error');
                 });
         }
 
-        // 6. Chart.js (กราฟ - ปัจจุบันเป็น Mock Data คงที่)
-        // ถ้าต้องการกราฟจริง ต้องเขียน Logic นำ data มา group ตามชั่วโมง
-        const ctx = document.getElementById('trafficChart').getContext('2d');
-        const trafficChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'],
-                datasets: [
-                    {
-                        label: 'รถเข้า',
-                        data: [12, 19, 3, 5, 2, 3, 10], // ข้อมูลสมมติ
-                        backgroundColor: '#4e73df',
-                        borderRadius: 5
-                    },
-                    {
-                        label: 'รถออก',
-                        data: [2, 5, 13, 8, 12, 5, 4], // ข้อมูลสมมติ
-                        backgroundColor: '#f6c23e',
-                        borderRadius: 5
-                    }
-                ]
-            },
-            options: {
-                maintainAspectRatio: false,
-                scales: {
-                    y: { beginAtZero: true, grid: { borderDash: [2, 4] } },
-                    x: { grid: { display: false } }
-                },
-                plugins: {
-                    legend: { position: 'top' }
-                }
-            }
-        });
-
-        
-        // *** เรียกใช้งานเมื่อเปิดเว็บ ***
-        window.addEventListener('load', function() {
-            updateTime();
-            loadData(); // โหลดครั้งแรกทันที
-            
-            // เพิ่ม: สั่งให้โหลดข้อมูลใหม่ทุกๆ 3 วินาที (Auto Refresh)
-            setInterval(() => {
-                // โหลดข้อมูลใหม่แบบเงียบๆ (ไม่ต้องโชว์ Loading ตลอดเวลา)
-                fetch(scriptURL + '?action=read')
-                .then(response => response.json())
-                .then(json => {
-                    if(json.result === "success") {
-                        // เช็คว่าข้อมูลเปลี่ยนไปไหม หรือจะทับเลยก็ได้
-                        carData = json.data; 
-                        renderDashboardTable(); 
-                        renderFullTable();      
-                        updateStats();          
-                    }
-                })
-                .catch(err => console.error('Auto-refresh error:', err));
-            }, 3000); // 3000 ms = 3 วินาที
-        });
-
-        // --- ฟังก์ชันลบข้อมูล ---
+        // --- 7. Delete Data ---
         function deleteData(plate) {
             Swal.fire({
                 title: 'ยืนยันการลบ?',
-                text: "คุณต้องการลบทะเบียน " + plate + " ใช่หรือไม่?",
+                text: "ลบทะเบียน " + plate,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'ใช่, ลบเลย!',
-                cancelButtonText: 'ยกเลิก'
+                confirmButtonText: 'ลบเลย'
             }).then((result) => {
                 if (result.isConfirmed) {
                     Swal.fire({ title: 'กำลังลบ...', didOpen: () => Swal.showLoading() });
-                    
-                    // สร้าง Form Data เพื่อส่งคำสั่งลบ
                     const formData = new FormData();
-                    formData.append('action', 'delete'); // บอก Script ว่าให้ลบ
-                    formData.append('license_plate', plate); // บอกทะเบียนที่จะลบ
+                    formData.append('action', 'delete');
+                    formData.append('license_plate', plate);
 
                     fetch(scriptURL, { method: 'POST', body: formData })
-                        .then(response => response.json())
+                        .then(res => res.json())
                         .then(res => {
                             if(res.result === 'success'){
                                 Swal.fire('ลบสำเร็จ!', '', 'success');
-                                loadData(); // โหลดตารางใหม่
+                                loadCarDatabase(); // โหลดตารางใหม่
                             } else {
-                                Swal.fire('ผิดพลาด', 'ไม่พบข้อมูล หรือระบบมีปัญหา', 'error');
+                                Swal.fire('ผิดพลาด', res.message, 'error');
                             }
-                        })
-                        .catch(err => console.error(err));
+                        });
                 }
             });
         }
 
-        // --- ฟังก์ชันแก้ไขข้อมูล (ใช้ Popup ของ SweetAlert) ---
+        // --- 8. Edit Data ---
         function editData(plate, prov, brand, color, owner) {
             Swal.fire({
                 title: 'แก้ไขข้อมูลรถ',
@@ -630,7 +579,7 @@
                     <input id="edit-owner" class="swal2-input" placeholder="เจ้าของ" value="${owner}">
                 `,
                 showCancelButton: true,
-                confirmButtonText: 'บันทึกแก้ไข',
+                confirmButtonText: 'บันทึก',
                 preConfirm: () => {
                     return {
                         newPlate: document.getElementById('edit-plate').value,
@@ -646,10 +595,8 @@
                     Swal.fire({ title: 'กำลังบันทึก...', didOpen: () => Swal.showLoading() });
 
                     const formData = new FormData();
-                    formData.append('action', 'edit'); // บอก Script ว่าให้แก้ไข
-                    formData.append('old_license_plate', plate); // ส่งทะเบียนเก่าไปหาบรรทัด
-                    
-                    // ส่งค่าใหม่ไปบันทึก
+                    formData.append('action', 'edit');
+                    formData.append('old_license_plate', plate);
                     formData.append('license_plate', data.newPlate);
                     formData.append('province', data.newProv);
                     formData.append('brand', data.newBrand);
@@ -657,11 +604,11 @@
                     formData.append('owner', data.newOwner);
 
                     fetch(scriptURL, { method: 'POST', body: formData })
-                        .then(response => response.json())
+                        .then(res => res.json())
                         .then(res => {
                             if(res.result === 'success'){
                                 Swal.fire('บันทึกแล้ว!', '', 'success');
-                                loadData(); // โหลดตารางใหม่
+                                loadCarDatabase();
                             } else {
                                 Swal.fire('Error', res.message, 'error');
                             }
@@ -669,6 +616,42 @@
                 }
             });
         }
+
+        // Helper: จัดรูปแบบวันที่
+        function formatDate(dateString) {
+            if(!dateString) return '-';
+            // ถ้า Google Sheet ส่งมาเป็นรูปแบบแปลกๆ อาจต้องปรับตรงนี้
+            return dateString; 
+        }
+
+        // --- 9. Chart.js (Mockup) ---
+        const ctx = document.getElementById('trafficChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00'],
+                datasets: [
+                    { label: 'รถเข้า', data: [12, 19, 3, 5, 2, 3, 10], backgroundColor: '#4e73df' },
+                    { label: 'รถออก', data: [2, 5, 13, 8, 12, 5, 4], backgroundColor: '#f6c23e' }
+                ]
+            },
+            options: { maintainAspectRatio: false, plugins: { legend: { position: 'top' } } }
+        });
+
+        // ==========================================
+        // [Main Logic] เริ่มทำงานเมื่อเปิดเว็บ
+        // ==========================================
+        window.addEventListener('load', function() {
+            // 1. ดึง Log ล่าสุดมาแสดงทันที
+            fetchRealtimeLogs();
+
+            // 2. ตั้งเวลาดึง Log ใหม่ทุกๆ 3 วินาที (Real-time)
+            setInterval(fetchRealtimeLogs, 3000);
+
+            // 3. โหลด Database รอไว้
+            loadCarDatabase();
+        });
+
     </script>
 </body>
 </html>
