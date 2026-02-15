@@ -254,7 +254,7 @@
                             </table>
                         </div>
                         <nav aria-label="Page navigation" class="mt-3">
-                            <ul class="pagination justify-content-end mb-0">
+                            <ul class="pagination justify-content-end mb-0" id="dashboard-pagination">
                                 <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
                                 <li class="page-item active"><a class="page-link" href="#">1</a></li>
                                 <li class="page-item"><a class="page-link" href="#">2</a></li>
@@ -305,7 +305,7 @@
                 </div>
 
                 <nav aria-label="Page navigation" class="mt-4">
-                    <ul class="pagination justify-content-center">
+                    <ul class="pagination justify-content-center" id="pagination-controls">
                         <li class="page-item disabled"><a class="page-link" href="#">ก่อนหน้า</a></li>
                         <li class="page-item active"><a class="page-link" href="#">1</a></li>
                         <li class="page-item"><a class="page-link" href="#">2</a></li>
@@ -376,10 +376,20 @@
 
     </div>
 
-    <script>
+        <script>
+         // --- ตัวแปรสำหรับจัดการแบ่งหน้าทะเบียนรถ (Pagination) ---
+        let allCarData = [];      // เก็บข้อมูลทั้งหมดที่โหลดมา
+        let currentPage = 1;      // หน้าปัจจุบัน
+        const rowsPerPage = 10;   // จำนวนรายการต่อหน้า
+
+        // --- ตัวแปรสำหรับ Pagination ของหน้า Dashboard หลัก---
+        let allDashboardLogs = [];  // เก็บ Log ทั้งหมด
+        let dashboardPage = 1;      // หน้าปัจจุบันของ Dashboard
+        const dashboardLimit = 10;  // จำนวนแถวต่อหน้า
+
         // --- 1. ตั้งค่าพื้นฐาน ---
         // URL ของ Google Apps Script (ตรวจสอบให้แน่ใจว่าเป็น Deployment ล่าสุด)
-        const scriptURL = 'https://script.google.com/macros/s/AKfycbxKZIoVrcfRZT620ODb2MWNoVYWOsoCehrDmn8eLMAXCc0X3FuvSUidu0YTnYMOzlCY/exec'; 
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbxmk2_qFnZiYPOsRIcWvvPNN3TYeyS7lmOukSo9na_LWTFEr2Q2Gzz4zdsRCHbtz2ac/exec'; 
 
         // --- 2. นาฬิกา (Clock) ---
         function updateTime() {
@@ -404,29 +414,37 @@
             }
         }
 
-        // --- 4. โหลดข้อมูล "Log การเข้า-ออก" (Dashboard Real-time) ---
+        // --- 4. โหลดข้อมูล "Log การเข้า-ออก" (Updated) ---
         function fetchRealtimeLogs() {
-            // ใส่ &t=... เพื่อแก้ปัญหา Browser จำค่าเดิม (Cache)
             fetch(scriptURL + "?action=read_log&t=" + new Date().getTime())
             .then(response => response.json())
             .then(json => {
                 if (json.result === "success") {
-                    updateDashboardTable(json.data); // วาดตาราง
-                    updateStats(json.data); // อัพเดทตัวเลขการ์ด
+                    // 1. เก็บข้อมูลทั้งหมด (และกลับด้านเอาล่าสุดขึ้นก่อน)
+                    allDashboardLogs = json.data.slice(); 
+                    
+                    // 2. อัพเดทตัวเลขสถิติ (การ์ดด้านบน)
+                    updateStats(allDashboardLogs); 
+                    
+                    // 3. วาดตารางตามหน้าปัจจุบัน (จะไม่รีเซ็ตเป็นหน้า 1 เพื่อให้คนดูข้อมูลหน้าเก่าได้ต่อเนื่อง)
+                    renderDashboardPage(dashboardPage);
                 }
             })
             .catch(error => console.error('Error fetching logs:', error));
         }
 
-        // ฟังก์ชันวาดตาราง Dashboard
-        function updateDashboardTable(logs) {
-            const tbody = document.getElementById('dashboard-table-body'); // แก้ ID ให้ถูก
+        // ฟังก์ชันวาดตาราง Dashboard ตามเลขหน้า
+        function renderDashboardPage(page) {
+            const tbody = document.getElementById('dashboard-table-body');
             tbody.innerHTML = ""; 
-            
-            // แสดงแค่ 10 รายการล่าสุด
-            const recentLogs = logs.slice(0, 10); 
 
-            recentLogs.forEach(item => {
+            // คำนวณขอบเขตข้อมูล
+            const startIndex = (page - 1) * dashboardLimit;
+            const endIndex = startIndex + dashboardLimit;
+            const pageData = allDashboardLogs.slice(startIndex, endIndex);
+
+            // วาดแถว
+            pageData.forEach(item => {
                 let statusVal = item['status'] ? item['status'].toLowerCase() : '';
                 let statusBadge = '';
                 
@@ -447,6 +465,60 @@
                     </tr>
                 `;
             });
+
+            // สร้างปุ่มกดเปลี่ยนหน้า
+            renderDashboardPagination();
+        }
+
+        // ฟังก์ชันสร้างปุ่ม Pagination สำหรับ Dashboard หลัก
+        function renderDashboardPagination() {
+            const paginationEl = document.getElementById('dashboard-pagination');
+            paginationEl.innerHTML = '';
+
+            const totalPages = Math.ceil(allDashboardLogs.length / dashboardLimit);
+            
+            // ถ้าไม่มีข้อมูล หรือมีหน้าเดียว ไม่ต้องโชว์ปุ่มก็ได้ (หรือจะโชว์ก็ได้ตามชอบ)
+            if (totalPages <= 1) return;
+
+            // ปุ่ม Previous
+            const prevClass = dashboardPage === 1 ? 'disabled' : '';
+            paginationEl.innerHTML += `
+                <li class="page-item ${prevClass}">
+                    <a class="page-link" href="#" onclick="changeDashboardPage(${dashboardPage - 1}); return false;">ก่อนหน้า</a>
+                </li>
+            `;
+
+            // ปุ่มตัวเลข (แสดงแบบย่อ: หน้าแรก, หน้าปัจจุบัน, หน้าสุดท้าย)
+            // หรือจะวน Loop แสดงทุกหน้าเหมือนเดิมก็ได้ (อันนี้แบบแสดงทุกหน้า)
+            let startPage = Math.max(1, dashboardPage - 2);
+            let endPage = Math.min(totalPages, dashboardPage + 2);
+
+            // ถ้าหน้าเยอะเกินไป ให้แสดงเฉพาะช่วงใกล้ๆ
+            for (let i = startPage; i <= endPage; i++) {
+                const activeClass = i === dashboardPage ? 'active' : '';
+                paginationEl.innerHTML += `
+                    <li class="page-item ${activeClass}">
+                        <a class="page-link" href="#" onclick="changeDashboardPage(${i}); return false;">${i}</a>
+                    </li>
+                `;
+            }
+
+            // ปุ่ม Next
+            const nextClass = dashboardPage === totalPages ? 'disabled' : '';
+            paginationEl.innerHTML += `
+                <li class="page-item ${nextClass}">
+                    <a class="page-link" href="#" onclick="changeDashboardPage(${dashboardPage + 1}); return false;">ถัดไป</a>
+                </li>
+            `;
+        }
+
+        // ฟังก์ชันเปลี่ยนหน้าเมื่อกดปุ่ม (Dashboard)
+        function changeDashboardPage(page) {
+            const totalPages = Math.ceil(allDashboardLogs.length / dashboardLimit);
+            if (page < 1 || page > totalPages) return;
+            
+            dashboardPage = page;
+            renderDashboardPage(dashboardPage);
         }
 
         // ฟังก์ชันอัพเดทตัวเลขสถิติบนการ์ด
@@ -465,34 +537,53 @@
         }
 
 
-        // --- 5. โหลดข้อมูล "ทะเบียนรถทั้งหมด" (หน้า Car List) ---
+        // --- 5. โหลดข้อมูล "ทะเบียนรถทั้งหมด" (Updated) ---
         function loadCarDatabase() {
+            // แสดง Loading ที่ตารางระหว่างรอ
+            document.getElementById('full-table-body').innerHTML = `<tr><td colspan="8" class="text-center p-4">กำลังโหลดข้อมูล...</td></tr>`;
+
             fetch(scriptURL + '?action=read&t=' + new Date().getTime()) 
                 .then(response => response.json())
                 .then(json => {
                     if(json.result === "success") {
-                        renderFullTable(json.data);
+                        // 1. กลับด้านข้อมูลเอาล่าสุดขึ้นก่อน และเก็บใส่ตัวแปร Global
+                        allCarData = json.data.slice().reverse();
+                        
+                        // 2. รีเซ็ตไปหน้า 1 และสั่งวาดตาราง
+                        currentPage = 1;
+                        renderTablePage(currentPage);
                     }
+                })
+                .catch(err => {
+                    console.error(err);
+                    document.getElementById('full-table-body').innerHTML = `<tr><td colspan="8" class="text-center text-danger p-4">โหลดข้อมูลไม่สำเร็จ</td></tr>`;
                 });
         }
 
-        function renderFullTable(data) {
+        // ฟังก์ชันแสดงผลตามหน้า (Render Table by Page)
+        function renderTablePage(page) {
+            // คำนวณขอบเขตข้อมูลที่จะแสดง (เช่น หน้า 1 คือ index 0-9)
+            const startIndex = (page - 1) * rowsPerPage;
+            const endIndex = startIndex + rowsPerPage;
+            const pageData = allCarData.slice(startIndex, endIndex);
+
             const tbody = document.getElementById('full-table-body');
             tbody.innerHTML = '';
-            
-            // กลับด้านเอาล่าสุดขึ้นก่อน
-            const allData = data.slice().reverse();
 
-            allData.forEach((item, index) => {
+            // วาดแถวข้อมูล (Row)
+            pageData.forEach((item, index) => {
+                // คำนวณลำดับที่แท้จริง (เพื่อให้ลำดับรันต่อเนื่อง 1, 11, 21...)
+                const realIndex = startIndex + index + 1; 
+
                 tbody.innerHTML += `
                     <tr>
-                        <td>${index + 1}</td>
+                        <td>${realIndex}</td>
                         <td class="fw-bold">${item.license_plate}</td>
                         <td>${item.province}</td>
                         <td>${item.brand}</td>
                         <td>${item.color}</td>
                         <td>${item.owner}</td>
-                        <td>${item.status}</td>
+                        <td><span class="badge rounded-pill ${item.status === 'allow' ? 'bg-success' : 'bg-secondary'}">${item.status || 'ปกติ'}</span></td>
                         <td>
                             <button class="btn btn-sm btn-warning text-white me-1" 
                                 onclick="editData('${item.license_plate}', '${item.province}', '${item.brand}', '${item.color}', '${item.owner}')">
@@ -506,7 +597,56 @@
                     </tr>
                 `;
             });
+
+            // วาดปุ่มเปลี่ยนหน้า (Pagination Controls)
+            renderPaginationControls();
         }
+
+        // ฟังก์ชันสร้างปุ่มกดเปลี่ยนหน้า
+        function renderPaginationControls() {
+            const paginationEl = document.getElementById('pagination-controls');
+            paginationEl.innerHTML = '';
+
+            const totalPages = Math.ceil(allCarData.length / rowsPerPage);
+
+            // ปุ่ม "ก่อนหน้า" (Previous)
+            const prevClass = currentPage === 1 ? 'disabled' : '';
+            paginationEl.innerHTML += `
+                <li class="page-item ${prevClass}">
+                    <a class="page-link" href="#" onclick="changePage(${currentPage - 1}); return false;">ก่อนหน้า</a>
+                </li>
+            `;
+
+            // ปุ่มตัวเลขหน้า (Loop สร้างเลขหน้า)
+            // เพื่อความสวยงาม ถ้าหน้าเยอะอาจต้องทำ Logic ซ่อนเลข แต่เบื้องต้นโชว์หมดก่อน
+            for (let i = 1; i <= totalPages; i++) {
+                const activeClass = i === currentPage ? 'active' : '';
+                paginationEl.innerHTML += `
+                    <li class="page-item ${activeClass}">
+                        <a class="page-link" href="#" onclick="changePage(${i}); return false;">${i}</a>
+                    </li>
+                `;
+            }
+
+            // ปุ่ม "ถัดไป" (Next)
+            const nextClass = currentPage === totalPages ? 'disabled' : '';
+            paginationEl.innerHTML += `
+                <li class="page-item ${nextClass}">
+                    <a class="page-link" href="#" onclick="changePage(${currentPage + 1}); return false;">ถัดไป</a>
+                </li>
+            `;
+        }
+
+        // ฟังก์ชันเปลี่ยนหน้าเมื่อกดปุ่ม
+        function changePage(page) {
+            const totalPages = Math.ceil(allCarData.length / rowsPerPage);
+            // ตรวจสอบไม่ให้กดเกินจำนวนหน้าที่มี
+            if (page < 1 || page > totalPages) return;
+            
+            currentPage = page;
+            renderTablePage(currentPage);
+        }
+        
 
 
         // --- 6. Form Submit (เพิ่มข้อมูล) ---
@@ -653,5 +793,6 @@
         });
 
     </script>
+
 </body>
 </html>
